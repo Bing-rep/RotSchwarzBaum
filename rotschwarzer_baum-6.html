@@ -1,0 +1,3069 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rot-Schwarz-Baum Visualisierer</title>
+    <style>
+      :root {
+        --bg: #0f0f13;
+        --surface: #1a1a22;
+        --surface2: #22222e;
+        --border: #2e2e3e;
+        --text: #e8e6f0;
+        --text2: #9d9ab0;
+        --red: #e84545;
+        --red-dark: #c0282a;
+        --red-glow: #e8454540;
+        --black-node: #2a2a3a;
+        --black-border: #6060a0;
+        --accent: #7c6af7;
+        --accent2: #4fc3a0;
+        --warn: #f0a040;
+        --edge: #4a4a6a;
+        --nil: #333348;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--surface);
+      }
+      header h1 {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.3px;
+      }
+      header h1 span {
+        color: var(--red);
+      }
+      .badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text2);
+      }
+
+      .layout {
+        display: flex;
+        height: calc(100vh - 57px);
+      }
+
+      /* ─── Sidebar ─── */
+      .sidebar {
+        width: 300px;
+        min-width: 260px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+      }
+      .tab {
+        flex: 1;
+        padding: 10px 6px;
+        font-size: 12px;
+        font-weight: 500;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text2);
+        transition:
+          color 0.2s,
+          border-bottom 0.2s;
+        border-bottom: 2px solid transparent;
+      }
+      .tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .panel {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 16px;
+        gap: 12px;
+      }
+      .panel.active {
+        display: flex;
+      }
+
+      .section-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text2);
+        margin-bottom: 4px;
+      }
+
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 13px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      input[type="text"]:focus,
+      textarea:focus {
+        border-color: var(--accent);
+      }
+      textarea {
+        resize: vertical;
+        min-height: 70px;
+        font-family: "Courier New", monospace;
+      }
+
+      .btn {
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition:
+          opacity 0.15s,
+          transform 0.1s;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn-danger {
+        background: var(--red);
+        color: #fff;
+      }
+      .btn-ghost {
+        background: var(--surface2);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .speed-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--text2);
+      }
+      input[type="range"] {
+        flex: 1;
+        -webkit-appearance: none;
+        height: 3px;
+        background: var(--border);
+        border-radius: 2px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+      }
+
+      /* Legend */
+      .legend {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .legend-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* Log */
+      #log {
+        flex: 1;
+        overflow-y: auto;
+        font-size: 12px;
+        font-family: "Courier New", monospace;
+        line-height: 1.7;
+        color: var(--text2);
+        background: var(--surface2);
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      #log .step {
+        color: var(--accent2);
+      }
+      #log .rot {
+        color: var(--warn);
+      }
+      #log .recolor {
+        color: var(--accent);
+      }
+      #log .done {
+        color: var(--text);
+      }
+
+      /* Properties panel */
+      .prop-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .prop-card {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      .prop-label {
+        font-size: 11px;
+        color: var(--text2);
+        margin-bottom: 2px;
+      }
+      .prop-value {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .prop-value.ok {
+        color: var(--accent2);
+      }
+      .prop-value.err {
+        color: var(--red);
+      }
+
+      /* Rules */
+      .rule-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .rule-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+      }
+      .rule-num {
+        min-width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        background: var(--accent);
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .rule-list li.violated {
+        border-color: var(--red);
+      }
+      .rule-list li.violated .rule-num {
+        background: var(--red);
+      }
+
+      /* ─── Canvas Area ─── */
+      .canvas-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .toolbar {
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .toolbar span {
+        font-size: 12px;
+        color: var(--text2);
+        margin-right: 4px;
+      }
+      #status-bar {
+        padding: 6px 16px;
+        font-size: 12px;
+        color: var(--text2);
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        min-height: 28px;
+      }
+      #status-bar .highlight {
+        color: var(--accent2);
+        font-weight: 500;
+      }
+      #status-bar .warning {
+        color: var(--warn);
+        font-weight: 500;
+      }
+
+      svg#tree {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+      }
+      svg#tree:active {
+        cursor: grabbing;
+      }
+
+      /* SVG node styles */
+      .node-circle {
+        transition:
+          r 0.3s,
+          cx 0.4s,
+          cy 0.4s;
+        stroke-width: 2.5;
+      }
+      .node-red {
+        fill: var(--red);
+        stroke: var(--red-dark);
+      }
+      .node-black {
+        fill: var(--black-node);
+        stroke: var(--black-border);
+      }
+      .node-nil {
+        fill: var(--nil);
+        stroke: var(--border);
+      }
+      .node-text {
+        font-size: 13px;
+        font-weight: 600;
+        fill: #fff;
+        pointer-events: none;
+      }
+      .node-text-nil {
+        font-size: 9px;
+        fill: var(--text2);
+        pointer-events: none;
+      }
+      .edge-line {
+        stroke: var(--edge);
+        stroke-width: 1.5;
+        fill: none;
+      }
+
+      .highlight-node .node-circle {
+        filter: drop-shadow(0 0 8px var(--accent2));
+        stroke: var(--accent2) !important;
+      }
+      .highlight-rotate .node-circle {
+        filter: drop-shadow(0 0 10px var(--warn));
+        stroke: var(--warn) !important;
+      }
+      .highlight-recolor .node-circle {
+        filter: drop-shadow(0 0 8px var(--accent));
+        stroke: var(--accent) !important;
+      }
+      .highlight-new .node-circle {
+        filter: drop-shadow(0 0 12px var(--red));
+      }
+
+      .node-group {
+        cursor: pointer;
+      }
+      .node-group:hover .node-circle {
+        opacity: 0.85;
+      }
+
+      /* Rotation arc */
+      .rot-arc {
+        fill: none;
+        stroke: var(--warn);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 3;
+        opacity: 0;
+      }
+      .rot-arc.show {
+        opacity: 1;
+        animation: dashMove 0.8s linear infinite;
+      }
+      @keyframes dashMove {
+        to {
+          stroke-dashoffset: -14;
+        }
+      }
+
+      /* Zoom controls */
+      .zoom-controls {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .zoom-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+      .zoom-btn:hover {
+        background: var(--surface2);
+      }
+
+      .canvas-container {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Preorder hint */
+      .hint-box {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--text2);
+        line-height: 1.6;
+      }
+      .hint-box code {
+        color: var(--accent);
+        background: var(--bg);
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+
+      .example-btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .example-btn {
+        font-size: 11px;
+        padding: 4px 10px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        cursor: pointer;
+        color: var(--text2);
+        transition:
+          border-color 0.2s,
+          color 0.2s;
+      }
+      .example-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .anim-node {
+        transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      /* Floating NIL insert popup */
+      #nil-popup {
+        position: absolute;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        background: var(--surface);
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        padding: 10px 12px;
+        box-shadow: 0 4px 20px #0006;
+        z-index: 100;
+        min-width: 160px;
+      }
+      #nil-popup.visible {
+        display: flex;
+      }
+      #nil-popup label {
+        font-size: 11px;
+        color: var(--text2);
+      }
+      #nil-popup input {
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 14px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        outline: none;
+        text-align: center;
+      }
+      #nil-popup input:focus {
+        border-color: var(--accent);
+      }
+      #nil-popup .popup-btns {
+        display: flex;
+        gap: 6px;
+      }
+      #nil-popup .popup-btns button {
+        flex: 1;
+        padding: 5px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+      }
+      #nil-popup .ok-btn {
+        background: var(--accent);
+        color: #fff;
+      }
+      #nil-popup .cancel-btn {
+        background: var(--surface2);
+        color: var(--text2);
+        border: 1px solid var(--border) !important;
+      }
+      .nil-clickable:hover .node-circle {
+        stroke: var(--accent) !important;
+      }
+
+      /* Node hover tooltip */
+      #node-tooltip {
+        position: absolute;
+        pointer-events: none;
+        display: none;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 11px;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text);
+        box-shadow: 0 4px 16px #0005;
+        z-index: 200;
+        white-space: nowrap;
+      }
+      #node-tooltip.visible {
+        display: block;
+      }
+      #node-tooltip .tt-bh {
+        color: var(--accent2);
+        font-weight: 500;
+        font-size: 14px;
+      }
+      #node-tooltip .tt-label {
+        color: var(--text2);
+        font-size: 11px;
+      }
+
+      /* ── Step Animation Panel ── */
+      #step-panel {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 10px 14px;
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 50;
+      }
+      #step-panel.visible {
+        display: flex;
+      }
+      #step-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #step-title {
+        font-size: 13px;
+        font-weight: 600;
+        flex: 1;
+      }
+      #step-counter {
+        font-size: 11px;
+        color: var(--text2);
+      }
+      #step-desc {
+        font-size: 12px;
+        color: var(--text2);
+        line-height: 1.5;
+        background: var(--surface2);
+        border-radius: 6px;
+        padding: 7px 10px;
+        border-left: 3px solid var(--accent);
+        min-height: 32px;
+      }
+      #step-desc .case-label {
+        color: var(--warn);
+        font-weight: 600;
+      }
+      #step-desc .action {
+        color: var(--accent2);
+      }
+      #step-btns {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #step-btns button {
+        padding: 5px 14px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        color: var(--text);
+        cursor: pointer;
+      }
+      #step-btns button:hover {
+        background: var(--border);
+      }
+      #step-btns button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      #step-btns button:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .step-progress {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex: 1;
+      }
+      .step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--border);
+        transition: background 0.2s;
+      }
+      .step-dot.active {
+        background: var(--accent);
+      }
+      .step-dot.done {
+        background: var(--accent2);
+      }
+
+      /* Rotation arc overlay on SVG */
+      .rot-highlight {
+        animation: rotPulse 0.6s ease-in-out infinite alternate;
+      }
+      @keyframes rotPulse {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0.4;
+        }
+      }
+      .node-current .node-circle {
+        stroke: var(--warn) !important;
+        stroke-width: 3 !important;
+      }
+      .node-pivot .node-circle {
+        stroke: var(--accent2) !important;
+        stroke-width: 3 !important;
+      }
+      .node-uncle .node-circle {
+        stroke: #a0a0ff !important;
+        stroke-width: 3 !important;
+      }
+      .node-parent .node-circle {
+        stroke: var(--accent) !important;
+        stroke-width: 3 !important;
+      }
+      .node-gp .node-circle {
+        stroke: var(--warn) !important;
+        stroke-width: 2.5 !important;
+        stroke-dasharray: 5 3;
+      }
+
+      /* Rotation arc SVG path */
+      .rot-arc-path {
+        fill: none;
+        stroke-width: 2;
+        stroke-dasharray: 6 4;
+        animation: dashAnim 0.7s linear infinite;
+      }
+      @keyframes dashAnim {
+        to {
+          stroke-dashoffset: -20;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <circle
+          cx="11"
+          cy="11"
+          r="9"
+          fill="#e84545"
+          stroke="#c0282a"
+          stroke-width="1.5"
+        />
+        <circle cx="11" cy="11" r="4" fill="#0f0f13" />
+      </svg>
+      <h1>Rot-<span>Schwarz</span>-Baum</h1>
+      <span class="badge">Visualisierer</span>
+    </header>
+
+    <div class="layout">
+      <!-- SIDEBAR -->
+      <div class="sidebar">
+        <div class="tabs">
+          <button class="tab active" onclick="showTab('einfuegen')">
+            Einfügen
+          </button>
+          <button class="tab" onclick="showTab('log')">Protokoll</button>
+          <button class="tab" onclick="showTab('info')">Analyse</button>
+          <button class="tab" onclick="showTab('regeln')">Regeln</button>
+        </div>
+
+        <!-- EINFÜGEN -->
+        <div id="tab-einfuegen" class="panel active">
+          <div>
+            <div class="section-title">Preorder-Eingabe</div>
+            <div class="hint-box" style="margin-bottom: 8px">
+              Format: <code>Schlüssel[F]</code> oder <code>Schlüssel</code
+              ><br />
+              <code>R</code> = Rot, <code>S</code> = Schwarz (optional)<br />
+              Beispiel: <code>10S 5R 15R 3S 7S</code>
+            </div>
+            <textarea
+              id="preorder-input"
+              placeholder="z.B. 10S 5R 15R 3S 7S 12S 20S"
+              rows="3"
+            ></textarea>
+            <div class="btn-row" style="margin-top: 8px">
+              <button
+                class="btn btn-primary"
+                onclick="loadPreorder()"
+                style="flex: 1"
+              >
+                Baum laden
+              </button>
+              <button class="btn btn-ghost" onclick="clearTree()">✕</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Beispiele</div>
+            <div class="example-btns">
+              <button class="example-btn" onclick="loadExample('basic')">
+                Einfach
+              </button>
+              <button class="example-btn" onclick="loadExample('medium')">
+                Mittel
+              </button>
+              <button class="example-btn" onclick="loadExample('exam')">
+                Prüfung 1
+              </button>
+              <button class="example-btn" onclick="loadExample('exam2')">
+                Prüfung 2
+              </button>
+              <button class="example-btn" onclick="loadExample('large')">
+                Groß
+              </button>
+              <button
+                class="example-btn"
+                onclick="loadRandomQuiz()"
+                style="border-color: var(--warn); color: var(--warn)"
+              >
+                ? Zufällig
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="quiz-hint-box"
+            style="
+              display: none;
+              background: var(--surface2);
+              border: 1px solid var(--warn);
+              border-radius: 8px;
+              padding: 10px 12px;
+              font-size: 12px;
+              color: var(--text2);
+              line-height: 1.6;
+            "
+          >
+            <span style="color: var(--warn); font-weight: 500"
+              >Übungsaufgabe</span
+            ><br />
+            Alle Knoten sind ungefärbt (schwarz). Färbe den Baum korrekt als
+            gültigen Rot-Schwarz-Baum. Klicke Knoten zum Umfärben, dann prüfe
+            mit dem Regeln-Tab.
+            <br /><br />
+            <button
+              class="btn btn-ghost"
+              onclick="revealSolution()"
+              style="font-size: 11px; padding: 4px 10px; width: 100%"
+            >
+              Lösung anzeigen
+            </button>
+          </div>
+
+          <div>
+            <div class="section-title">Einzeln einfügen (mit Animation)</div>
+            <div style="display: flex; gap: 8px">
+              <input
+                type="text"
+                id="single-input"
+                placeholder="Schlüssel"
+                style="width: 100px"
+              />
+              <button
+                class="btn btn-primary"
+                onclick="insertSingle()"
+                style="flex: 1"
+              >
+                Einfügen
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Einzeln löschen</div>
+            <div style="display: flex; gap: 8px">
+              <input
+                type="text"
+                id="delete-input"
+                placeholder="Schlüssel"
+                style="width: 100px"
+              />
+              <button
+                class="btn btn-danger"
+                onclick="deleteSingle()"
+                style="flex: 1"
+              >
+                Löschen
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Animationsgeschwindigkeit</div>
+            <div class="speed-row">
+              <span>Langsam</span>
+              <input type="range" id="speed" min="1" max="5" value="3" />
+              <span>Schnell</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Legende</div>
+            <div class="legend">
+              <div class="legend-item">
+                <div
+                  class="legend-dot"
+                  style="background: #e84545; border: 2px solid #c0282a"
+                ></div>
+                Roter Knoten
+              </div>
+              <div class="legend-item">
+                <div
+                  class="legend-dot"
+                  style="background: #2a2a3a; border: 2px solid #6060a0"
+                ></div>
+                Schwarzer Knoten
+              </div>
+              <div class="legend-item">
+                <div
+                  class="legend-dot"
+                  style="background: #333348; border: 2px solid #2e2e3e"
+                ></div>
+                NIL-Blatt
+              </div>
+              <div class="legend-item">
+                <div
+                  class="legend-dot"
+                  style="
+                    width: 14px;
+                    height: 3px;
+                    border-radius: 2px;
+                    background: var(--warn);
+                  "
+                ></div>
+                Rotation
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOG -->
+        <div id="tab-log" class="panel">
+          <div class="section-title">Operationsprotokoll</div>
+          <div id="log">
+            <span style="color: var(--text2)">Noch keine Operationen…</span>
+          </div>
+        </div>
+
+        <!-- ANALYSE -->
+        <div id="tab-info" class="panel">
+          <div class="section-title">Baumeigenschaften</div>
+          <div class="prop-grid" id="props">
+            <div class="prop-card">
+              <div class="prop-label">Knoten</div>
+              <div class="prop-value" id="p-count">0</div>
+            </div>
+            <div class="prop-card">
+              <div class="prop-label">Höhe</div>
+              <div class="prop-value" id="p-height">–</div>
+            </div>
+            <div class="prop-card">
+              <div class="prop-label">Schwarzhöhe</div>
+              <div class="prop-value" id="p-bh">–</div>
+            </div>
+            <div class="prop-card">
+              <div class="prop-label">Gültig</div>
+              <div class="prop-value" id="p-valid">–</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top: 4px">
+            Traversierungen
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <button
+              class="btn btn-ghost"
+              onclick="showTraversal('inorder')"
+              style="text-align: left; font-size: 12px"
+            >
+              Inorder (aufsteigend)
+            </button>
+            <button
+              class="btn btn-ghost"
+              onclick="showTraversal('preorder')"
+              style="text-align: left; font-size: 12px"
+            >
+              Preorder
+            </button>
+            <button
+              class="btn btn-ghost"
+              onclick="showTraversal('postorder')"
+              style="text-align: left; font-size: 12px"
+            >
+              Postorder
+            </button>
+          </div>
+          <div
+            id="traversal-result"
+            style="
+              font-size: 12px;
+              font-family: monospace;
+              color: var(--accent);
+              background: var(--surface2);
+              padding: 8px;
+              border-radius: 8px;
+              min-height: 36px;
+              word-break: break-all;
+            "
+          ></div>
+
+          <div class="section-title">Suchen</div>
+          <div style="display: flex; gap: 8px">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Schlüssel suchen"
+              style="flex: 1"
+            />
+            <button class="btn btn-ghost" onclick="searchNode()">Suchen</button>
+          </div>
+        </div>
+
+        <!-- REGELN -->
+        <div id="tab-regeln" class="panel">
+          <div class="section-title">RSB-Eigenschaften</div>
+          <ul class="rule-list" id="rules">
+            <li id="rule-bst">
+              <span class="rule-num">BST</span>Binäre Suchbaum-Eigenschaft:
+              linkes Kind &lt; Elter &lt; rechtes Kind.
+            </li>
+            <li id="rule1">
+              <span class="rule-num">1</span>Jeder Knoten ist rot oder schwarz.
+            </li>
+            <li id="rule2">
+              <span class="rule-num">2</span>Die Wurzel ist schwarz.
+            </li>
+            <li id="rule3">
+              <span class="rule-num">3</span>NIL-Blätter gelten als schwarz.
+            </li>
+            <li id="rule4">
+              <span class="rule-num">4</span>Keine zwei roten Knoten sind direkt
+              verbunden (Elter-Kind).
+            </li>
+            <li id="rule5">
+              <span class="rule-num">5</span>Alle Pfade von einem Knoten zu NIL
+              haben dieselbe Schwarzhöhe.
+            </li>
+          </ul>
+          <div style="margin-top: 8px">
+            <button
+              class="btn btn-ghost"
+              onclick="validateRules()"
+              style="width: 100%; font-size: 12px"
+            >
+              Regeln prüfen
+            </button>
+          </div>
+          <div
+            id="rule-result"
+            style="font-size: 12px; margin-top: 6px; color: var(--text2)"
+          ></div>
+        </div>
+      </div>
+
+      <!-- CANVAS -->
+      <div class="canvas-wrap">
+        <div class="toolbar">
+          <span>Ansicht:</span>
+          <button
+            class="btn btn-ghost"
+            onclick="toggleNilNodes()"
+            style="font-size: 12px"
+            id="nil-toggle"
+          >
+            NIL verstecken
+          </button>
+          <button
+            class="btn btn-ghost"
+            onclick="fitView()"
+            style="font-size: 12px"
+          >
+            Anpassen
+          </button>
+          <button
+            class="btn btn-ghost"
+            onclick="resetZoom()"
+            style="font-size: 12px"
+          >
+            Reset
+          </button>
+        </div>
+        <div id="status-bar">
+          Baum ist leer. Lade ein Beispiel oder füge Knoten ein.
+        </div>
+        <div class="canvas-container" id="canvas-container">
+          <div id="node-tooltip"></div>
+          <!-- NIL insert popup -->
+          <div id="nil-popup">
+            <label>Schlüssel einfügen</label>
+            <input type="number" id="nil-popup-input" placeholder="z.B. 42" />
+            <div class="popup-btns">
+              <button class="ok-btn" onclick="confirmNilInsert()">
+                Einfügen
+              </button>
+              <button class="cancel-btn" onclick="closeNilPopup()">
+                Abbrechen
+              </button>
+            </div>
+          </div>
+          <svg id="tree" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="8"
+                markerHeight="6"
+                refX="6"
+                refY="3"
+                orient="auto"
+              >
+                <polygon points="0 0, 8 3, 0 6" fill="var(--edge)" />
+              </marker>
+            </defs>
+            <g id="scene"></g>
+          </svg>
+
+          <!-- Step Animation Panel -->
+          <div id="step-panel">
+            <div id="step-header">
+              <span id="step-title">Schritt</span>
+              <div class="step-progress" id="step-progress"></div>
+              <span id="step-counter">0 / 0</span>
+              <button
+                onclick="closeStepPanel()"
+                style="
+                  padding: 2px 8px;
+                  font-size: 12px;
+                  border-radius: 4px;
+                  border: 1px solid var(--border);
+                  background: none;
+                  color: var(--text2);
+                  cursor: pointer;
+                "
+              >
+                ✕
+              </button>
+            </div>
+            <div id="step-desc"></div>
+            <div id="step-btns">
+              <button id="btn-prev" onclick="stepPrev()" disabled>
+                ← Zurück
+              </button>
+              <button id="btn-next" onclick="stepNext()" class="primary">
+                Weiter →
+              </button>
+              <button onclick="stepSkipAll()">Alle überspringen</button>
+            </div>
+          </div>
+          <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoom(1.2)">+</button>
+            <button class="zoom-btn" onclick="zoom(0.85)">−</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ═══════════════════════════════════════
+      //   DATA STRUCTURES
+      // ═══════════════════════════════════════
+      const RED = "R",
+        BLACK = "S";
+
+      class RBNode {
+        constructor(key, color = RED) {
+          this.key = key;
+          this.color = color;
+          this.left = null;
+          this.right = null;
+          this.parent = null;
+        }
+      }
+
+      class RBTree {
+        constructor() {
+          this.NIL = new RBNode(null, BLACK);
+          this.NIL.isNil = true;
+          this.root = this.NIL;
+        }
+
+        // ── Rotations ──
+        rotateLeft(x) {
+          const y = x.right;
+          x.right = y.left;
+          if (y.left !== this.NIL) y.left.parent = x;
+          y.parent = x.parent;
+          if (x.parent === null) this.root = y;
+          else if (x === x.parent.left) x.parent.left = y;
+          else x.parent.right = y;
+          y.left = x;
+          x.parent = y;
+          return y;
+        }
+
+        rotateRight(x) {
+          const y = x.left;
+          x.left = y.right;
+          if (y.right !== this.NIL) y.right.parent = x;
+          y.parent = x.parent;
+          if (x.parent === null) this.root = y;
+          else if (x === x.parent.right) x.parent.right = y;
+          else x.parent.left = y;
+          y.right = x;
+          x.parent = y;
+          return y;
+        }
+
+        // ── Insert ──
+        insert(key) {
+          const z = new RBNode(key, RED);
+          z.left = this.NIL;
+          z.right = this.NIL;
+          let y = null,
+            x = this.root;
+          while (x !== this.NIL) {
+            y = x;
+            if (z.key < x.key) x = x.left;
+            else if (z.key > x.key) x = x.right;
+            else return null; // duplicate
+          }
+          z.parent = y;
+          if (y === null) this.root = z;
+          else if (z.key < y.key) y.left = z;
+          else y.right = z;
+          this.insertFixup(z);
+          return z;
+        }
+
+        // insertFixupSteps: simulate fixup and return list of snapshots (tree state + annotation)
+        // Does NOT mutate the tree — snapshots are deep copies
+        insertFixupSteps(insertedKey) {
+          const snapshots = [];
+
+          const deepCopy = (node, nil) => {
+            if (node === nil) return null;
+            const n = {
+              key: node.key,
+              color: node.color,
+              left: null,
+              right: null,
+            };
+            n.left = deepCopy(node.left, nil);
+            n.right = deepCopy(node.right, nil);
+            return n;
+          };
+
+          const snap = (label, desc, highlights) => {
+            snapshots.push({
+              treeSnapshot: deepCopy(this.root, this.NIL),
+              label,
+              desc,
+              highlights: highlights || {},
+            });
+          };
+
+          // We run the actual fixup but take snapshots at each interesting moment
+          let z = this.search(insertedKey);
+          if (!z) return snapshots;
+
+          snap(
+            "Einfügen",
+            `Knoten <span class="action">${insertedKey}</span> als <span style="color:var(--red)">roter</span> Knoten eingefügt.`,
+            { current: insertedKey, parent: z.parent?.key },
+          );
+
+          let iteration = 0;
+          while (z.parent && z.parent.color === RED) {
+            iteration++;
+            const zKey = z.key;
+            const parentKey = z.parent.key;
+            const gpKey = z.parent.parent?.key;
+
+            if (z.parent === z.parent.parent.left) {
+              const uncle = z.parent.parent.right;
+              const uncleKey = uncle === this.NIL ? null : uncle.key;
+
+              snap(
+                `Iteration ${iteration} – Prüfung`,
+                `<span class="case-label">Elter ${parentKey} ist rot</span> (links von Großelter ${gpKey}).<br>` +
+                  `Onkel: ${uncle === this.NIL ? "<em>NIL (schwarz)</em>" : `<span style="color:${uncle.color === RED ? "var(--red)" : "#8888cc"}">${uncleKey} (${uncle.color === RED ? "rot" : "schwarz"})</span>`}`,
+                {
+                  current: zKey,
+                  parent: parentKey,
+                  gp: gpKey,
+                  uncle: uncleKey,
+                },
+              );
+
+              if (uncle.color === RED) {
+                snap(
+                  `Iteration ${iteration} – Fall 1: Umfärben`,
+                  `<span class="case-label">Fall 1</span> – Onkel ist rot.<br>` +
+                    `<span class="action">Elter ${parentKey} → schwarz, Onkel ${uncleKey} → schwarz, Großelter ${gpKey} → rot.</span>`,
+                  {
+                    current: zKey,
+                    parent: parentKey,
+                    gp: gpKey,
+                    uncle: uncleKey,
+                  },
+                );
+                z.parent.color = BLACK;
+                uncle.color = BLACK;
+                z.parent.parent.color = RED;
+                snap(
+                  `Iteration ${iteration} – Fall 1: Ergebnis`,
+                  `Umfärbung abgeschlossen. Setze <span class="action">z = ${gpKey}</span> und prüfe weiter.`,
+                  { current: gpKey },
+                );
+                z = z.parent.parent;
+              } else {
+                if (z === z.parent.right) {
+                  snap(
+                    `Iteration ${iteration} – Fall 2: Linksrotation`,
+                    `<span class="case-label">Fall 2</span> – z ist rechtes Kind, Onkel schwarz.<br>` +
+                      `<span class="action">Linksrotation um ${parentKey}</span>, dann weiter mit Fall 3.`,
+                    {
+                      current: zKey,
+                      parent: parentKey,
+                      gp: gpKey,
+                      rotDir: "L",
+                      rotPivot: parentKey,
+                    },
+                  );
+                  z = z.parent;
+                  this.rotateLeft(z);
+                  snap(
+                    `Iteration ${iteration} – Nach Linksrotation`,
+                    `Rotation abgeschlossen. Neue Position: z = ${z.right?.key ?? z.key}.`,
+                    {
+                      current: z.right?.key ?? z.key,
+                      parent: z.key,
+                      gp: gpKey,
+                    },
+                  );
+                }
+                snap(
+                  `Iteration ${iteration} – Fall 3: Rechtsrotation`,
+                  `<span class="case-label">Fall 3</span> – z ist linkes Kind, Onkel schwarz.<br>` +
+                    `<span class="action">Elter ${z.parent.key} → schwarz, Großelter ${gpKey} → rot, Rechtsrotation um ${gpKey}.</span>`,
+                  {
+                    current: z.key,
+                    parent: z.parent.key,
+                    gp: gpKey,
+                    rotDir: "R",
+                    rotPivot: gpKey,
+                  },
+                );
+                z.parent.color = BLACK;
+                z.parent.parent.color = RED;
+                this.rotateRight(z.parent.parent);
+                snap(
+                  `Iteration ${iteration} – Fall 3: Ergebnis`,
+                  `Rechtsrotation abgeschlossen. Baum lokal repariert.`,
+                  { current: z.key },
+                );
+              }
+            } else {
+              const uncle = z.parent.parent.left;
+              const uncleKey = uncle === this.NIL ? null : uncle.key;
+
+              snap(
+                `Iteration ${iteration} – Prüfung`,
+                `<span class="case-label">Elter ${parentKey} ist rot</span> (rechts von Großelter ${gpKey}).<br>` +
+                  `Onkel: ${uncle === this.NIL ? "<em>NIL (schwarz)</em>" : `<span style="color:${uncle.color === RED ? "var(--red)" : "#8888cc"}">${uncleKey} (${uncle.color === RED ? "rot" : "schwarz"})</span>`}`,
+                {
+                  current: zKey,
+                  parent: parentKey,
+                  gp: gpKey,
+                  uncle: uncleKey,
+                },
+              );
+
+              if (uncle.color === RED) {
+                snap(
+                  `Iteration ${iteration} – Fall 1: Umfärben`,
+                  `<span class="case-label">Fall 1</span> – Onkel ist rot.<br>` +
+                    `<span class="action">Elter ${parentKey} → schwarz, Onkel ${uncleKey} → schwarz, Großelter ${gpKey} → rot.</span>`,
+                  {
+                    current: zKey,
+                    parent: parentKey,
+                    gp: gpKey,
+                    uncle: uncleKey,
+                  },
+                );
+                z.parent.color = BLACK;
+                uncle.color = BLACK;
+                z.parent.parent.color = RED;
+                snap(
+                  `Iteration ${iteration} – Fall 1: Ergebnis`,
+                  `Umfärbung abgeschlossen. Setze <span class="action">z = ${gpKey}</span> und prüfe weiter.`,
+                  { current: gpKey },
+                );
+                z = z.parent.parent;
+              } else {
+                if (z === z.parent.left) {
+                  snap(
+                    `Iteration ${iteration} – Fall 2: Rechtsrotation`,
+                    `<span class="case-label">Fall 2</span> – z ist linkes Kind, Onkel schwarz.<br>` +
+                      `<span class="action">Rechtsrotation um ${parentKey}</span>, dann weiter mit Fall 3.`,
+                    {
+                      current: zKey,
+                      parent: parentKey,
+                      gp: gpKey,
+                      rotDir: "R",
+                      rotPivot: parentKey,
+                    },
+                  );
+                  z = z.parent;
+                  this.rotateRight(z);
+                  snap(
+                    `Iteration ${iteration} – Nach Rechtsrotation`,
+                    `Rotation abgeschlossen. Neue Position von z.`,
+                    { current: z.left?.key ?? z.key, parent: z.key, gp: gpKey },
+                  );
+                }
+                snap(
+                  `Iteration ${iteration} – Fall 3: Linksrotation`,
+                  `<span class="case-label">Fall 3</span> – z ist rechtes Kind, Onkel schwarz.<br>` +
+                    `<span class="action">Elter ${z.parent.key} → schwarz, Großelter ${gpKey} → rot, Linksrotation um ${gpKey}.</span>`,
+                  {
+                    current: z.key,
+                    parent: z.parent.key,
+                    gp: gpKey,
+                    rotDir: "L",
+                    rotPivot: gpKey,
+                  },
+                );
+                z.parent.color = BLACK;
+                z.parent.parent.color = RED;
+                this.rotateLeft(z.parent.parent);
+                snap(
+                  `Iteration ${iteration} – Fall 3: Ergebnis`,
+                  `Linksrotation abgeschlossen. Baum lokal repariert.`,
+                  { current: z.key },
+                );
+              }
+            }
+          }
+          this.root.color = BLACK;
+          snap(
+            "Fertig",
+            `Einfügen von <span class="action">${insertedKey}</span> abgeschlossen. Wurzel ist schwarz. ✓`,
+            {},
+          );
+          return snapshots;
+        }
+
+        insertFixup(z) {
+          const steps = [];
+          while (z.parent && z.parent.color === RED) {
+            if (z.parent === z.parent.parent.left) {
+              const y = z.parent.parent.right;
+              if (y.color === RED) {
+                z.parent.color = BLACK;
+                y.color = BLACK;
+                z.parent.parent.color = RED;
+                steps.push({ type: "recolor", desc: `Umfärben` });
+                z = z.parent.parent;
+              } else {
+                if (z === z.parent.right) {
+                  z = z.parent;
+                  this.rotateLeft(z);
+                  steps.push({ type: "rotate", desc: `Linksrotation` });
+                }
+                z.parent.color = BLACK;
+                z.parent.parent.color = RED;
+                this.rotateRight(z.parent.parent);
+                steps.push({ type: "rotate", desc: `Rechtsrotation` });
+              }
+            } else {
+              const y = z.parent.parent.left;
+              if (y.color === RED) {
+                z.parent.color = BLACK;
+                y.color = BLACK;
+                z.parent.parent.color = RED;
+                steps.push({ type: "recolor", desc: `Umfärben` });
+                z = z.parent.parent;
+              } else {
+                if (z === z.parent.left) {
+                  z = z.parent;
+                  this.rotateRight(z);
+                  steps.push({ type: "rotate", desc: `Rechtsrotation` });
+                }
+                z.parent.color = BLACK;
+                z.parent.parent.color = RED;
+                this.rotateLeft(z.parent.parent);
+                steps.push({ type: "rotate", desc: `Linksrotation` });
+              }
+            }
+          }
+          this.root.color = BLACK;
+          return steps;
+        }
+
+        // ── Delete ──
+        delete(key) {
+          let z = this.search(key);
+          if (!z) return false;
+          let y = z,
+            yOrigColor = y.color,
+            x;
+          if (z.left === this.NIL) {
+            x = z.right;
+            this.transplant(z, z.right);
+          } else if (z.right === this.NIL) {
+            x = z.left;
+            this.transplant(z, z.left);
+          } else {
+            y = this.minimum(z.right);
+            yOrigColor = y.color;
+            x = y.right;
+            if (y.parent === z) x.parent = y;
+            else {
+              this.transplant(y, y.right);
+              y.right = z.right;
+              y.right.parent = y;
+            }
+            this.transplant(z, y);
+            y.left = z.left;
+            y.left.parent = y;
+            y.color = z.color;
+          }
+          if (yOrigColor === BLACK) this.deleteFixup(x);
+          return true;
+        }
+
+        transplant(u, v) {
+          if (u.parent === null) this.root = v;
+          else if (u === u.parent.left) u.parent.left = v;
+          else u.parent.right = v;
+          v.parent = u.parent;
+        }
+
+        deleteFixup(x) {
+          while (x !== this.root && x.color === BLACK) {
+            if (x === x.parent.left) {
+              let w = x.parent.right;
+              if (w.color === RED) {
+                w.color = BLACK;
+                x.parent.color = RED;
+                this.rotateLeft(x.parent);
+                w = x.parent.right;
+              }
+              if (w.left.color === BLACK && w.right.color === BLACK) {
+                w.color = RED;
+                x = x.parent;
+              } else {
+                if (w.right.color === BLACK) {
+                  w.left.color = BLACK;
+                  w.color = RED;
+                  this.rotateRight(w);
+                  w = x.parent.right;
+                }
+                w.color = x.parent.color;
+                x.parent.color = BLACK;
+                w.right.color = BLACK;
+                this.rotateLeft(x.parent);
+                x = this.root;
+              }
+            } else {
+              let w = x.parent.left;
+              if (w.color === RED) {
+                w.color = BLACK;
+                x.parent.color = RED;
+                this.rotateRight(x.parent);
+                w = x.parent.left;
+              }
+              if (w.right.color === BLACK && w.left.color === BLACK) {
+                w.color = RED;
+                x = x.parent;
+              } else {
+                if (w.left.color === BLACK) {
+                  w.right.color = BLACK;
+                  w.color = RED;
+                  this.rotateLeft(w);
+                  w = x.parent.left;
+                }
+                w.color = x.parent.color;
+                x.parent.color = BLACK;
+                w.left.color = BLACK;
+                this.rotateRight(x.parent);
+                x = this.root;
+              }
+            }
+          }
+          x.color = BLACK;
+        }
+
+        search(key) {
+          let x = this.root;
+          while (x !== this.NIL) {
+            if (key === x.key) return x;
+            x = key < x.key ? x.left : x.right;
+          }
+          return null;
+        }
+
+        minimum(x) {
+          while (x.left !== this.NIL) x = x.left;
+          return x;
+        }
+
+        // ── Analysis ──
+        height(node = this.root) {
+          if (node === this.NIL) return 0;
+          return 1 + Math.max(this.height(node.left), this.height(node.right));
+        }
+
+        blackHeight(node = this.root) {
+          if (node === this.NIL) return 1;
+          const lbh = this.blackHeight(node.left);
+          if (lbh === -1) return -1;
+          const rbh = this.blackHeight(node.right);
+          if (rbh === -1) return -1;
+          if (lbh !== rbh) return -1;
+          return lbh + (node.color === BLACK ? 1 : 0);
+        }
+
+        countNodes() {
+          let c = 0;
+          const walk = (n) => {
+            if (n === this.NIL) return;
+            c++;
+            walk(n.left);
+            walk(n.right);
+          };
+          walk(this.root);
+          return c;
+        }
+
+        validate() {
+          const violations = [];
+          // Rule 2: root black
+          if (this.root !== this.NIL && this.root.color !== BLACK)
+            violations.push({ rule: 2, msg: "Wurzel ist nicht schwarz" });
+          // Rule 4: no two consecutive reds
+          const checkRed = (n) => {
+            if (n === this.NIL) return;
+            if (n.color === RED) {
+              if (n.left.color === RED)
+                violations.push({
+                  rule: 4,
+                  msg: `Zwei rote Knoten: ${n.key} → ${n.left.key}`,
+                });
+              if (n.right.color === RED)
+                violations.push({
+                  rule: 4,
+                  msg: `Zwei rote Knoten: ${n.key} → ${n.right.key}`,
+                });
+            }
+            checkRed(n.left);
+            checkRed(n.right);
+          };
+          checkRed(this.root);
+          // Rule 5: black height
+          if (this.blackHeight() === -1)
+            violations.push({ rule: 5, msg: "Schwarzhöhen unterschiedlich" });
+          // BST property
+          const checkBST = (n, min, max) => {
+            if (n === this.NIL) return;
+            if (n.key <= min)
+              violations.push({
+                rule: "bst",
+                msg: `Knoten ${n.key} verletzt BST: zu klein (min > ${min})`,
+              });
+            else if (n.key >= max)
+              violations.push({
+                rule: "bst",
+                msg: `Knoten ${n.key} verletzt BST: zu groß (max < ${max})`,
+              });
+            else {
+              checkBST(n.left, min, n.key);
+              checkBST(n.right, n.key, max);
+            }
+          };
+          checkBST(this.root, -Infinity, Infinity);
+          return violations;
+        }
+
+        inorder() {
+          const r = [];
+          const w = (n) => {
+            if (n === this.NIL) return;
+            w(n.left);
+            r.push(n.key);
+            w(n.right);
+          };
+          w(this.root);
+          return r;
+        }
+        preorderArr() {
+          const r = [];
+          const w = (n) => {
+            if (n === this.NIL) return;
+            r.push(`${n.key}${n.color}`);
+            w(n.left);
+            w(n.right);
+          };
+          w(this.root);
+          return r;
+        }
+        postorder() {
+          const r = [];
+          const w = (n) => {
+            if (n === this.NIL) return;
+            w(n.left);
+            w(n.right);
+            r.push(n.key);
+          };
+          w(this.root);
+          return r;
+        }
+      }
+
+      // ═══════════════════════════════════════
+      //   GLOBALS
+      // ═══════════════════════════════════════
+      let tree = new RBTree();
+      let showNil = true;
+      let svgScale = 1,
+        svgPanX = 0,
+        svgPanY = 0;
+      let isPanning = false,
+        panStartX = 0,
+        panStartY = 0;
+      const NODE_R = 22,
+        H_GAP = 50,
+        V_GAP = 70;
+      const svg = document.getElementById("tree");
+      const scene = document.getElementById("scene");
+
+      // ═══════════════════════════════════════
+      //   LAYOUT CALCULATION
+      // ═══════════════════════════════════════
+      function calcLayout(node, positions = {}, depth = 0) {
+        if (node === tree.NIL) return { min: 0, max: 0, count: 0 };
+        // Use Reingold-Tilford like approach (simple version)
+        positions[node.key] = {};
+        return positions;
+      }
+
+      function assignPositions(
+        node,
+        positions = {},
+        xCounter = { v: 0 },
+        depth = 0,
+      ) {
+        if (node === tree.NIL || !node) return;
+        assignPositions(node.left, positions, xCounter, depth + 1);
+        positions[`${node.key}-${depth}`] = { x: xCounter.v++, y: depth, node };
+        assignPositions(node.right, positions, xCounter, depth + 1);
+        return positions;
+      }
+
+      function layoutTree() {
+        const positions = {};
+        const counter = { v: 0 };
+        assignPositions(tree.root, positions, counter, 0);
+        return positions;
+      }
+
+      // ═══════════════════════════════════════
+      //   RENDER
+      // ═══════════════════════════════════════
+      let currentLayout = {};
+
+      function render(highlightKey = null, highlightType = "") {
+        scene.innerHTML = "";
+        if (tree.root === tree.NIL) {
+          updateProps();
+          return;
+        }
+
+        // Use a proper Map keyed by node reference to avoid [object Object] collision
+        const positions = new Map();
+        const nilPositions = {}; // string-keyed for NIL nodes
+        const counter = { v: 0 };
+
+        function inorderPos(node, depth) {
+          if (!node || node === tree.NIL) return;
+          inorderPos(node.left, depth + 1);
+          positions.set(node, {
+            x: counter.v++ * (NODE_R * 2 + H_GAP),
+            y: depth * (NODE_R * 2 + V_GAP),
+          });
+          inorderPos(node.right, depth + 1);
+        }
+
+        inorderPos(tree.root, 0);
+
+        // Add NIL nodes positioned relative to their real parent
+        if (showNil) {
+          function addNils(node) {
+            if (!node || node === tree.NIL) return;
+            const p = positions.get(node);
+            if (!p) return;
+            if (node.left === tree.NIL) {
+              nilPositions[`nil-L-${node.key}`] = {
+                x: p.x - NODE_R - H_GAP * 0.4,
+                y: p.y + NODE_R * 2 + V_GAP * 0.6,
+                isNil: true,
+              };
+            } else addNils(node.left);
+            if (node.right === tree.NIL) {
+              nilPositions[`nil-R-${node.key}`] = {
+                x: p.x + NODE_R + H_GAP * 0.4,
+                y: p.y + NODE_R * 2 + V_GAP * 0.6,
+                isNil: true,
+              };
+            } else addNils(node.right);
+          }
+          addNils(tree.root);
+        }
+
+        currentLayout = positions;
+
+        // Draw edges first
+        function drawEdges(node) {
+          if (!node || node === tree.NIL) return;
+          const p = positions.get(node);
+          if (!p) return;
+
+          if (node.left !== tree.NIL) {
+            const c = positions.get(node.left);
+            if (c) drawEdge(p.x, p.y, c.x, c.y);
+            drawEdges(node.left);
+          } else if (showNil) {
+            const c = nilPositions[`nil-L-${node.key}`];
+            if (c) drawEdge(p.x, p.y, c.x, c.y, true);
+          }
+
+          if (node.right !== tree.NIL) {
+            const c = positions.get(node.right);
+            if (c) drawEdge(p.x, p.y, c.x, c.y);
+            drawEdges(node.right);
+          } else if (showNil) {
+            const c = nilPositions[`nil-R-${node.key}`];
+            if (c) drawEdge(p.x, p.y, c.x, c.y, true);
+          }
+        }
+
+        function drawEdge(x1, y1, x2, y2, dashed = false) {
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line",
+          );
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1 + NODE_R);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2 - NODE_R);
+          line.setAttribute("class", "edge-line");
+          if (dashed) {
+            line.setAttribute("stroke-dasharray", "3 3");
+            line.setAttribute("opacity", "0.4");
+          }
+          scene.appendChild(line);
+        }
+
+        drawEdges(tree.root);
+
+        // Draw NIL nodes (clickable to insert)
+        if (showNil) {
+          for (const [nilKey, np] of Object.entries(nilPositions)) {
+            const g = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "g",
+            );
+            g.setAttribute("transform", `translate(${np.x}, ${np.y})`);
+            g.style.cursor = "pointer";
+            g.setAttribute("class", "node-group nil-clickable");
+
+            const c = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "circle",
+            );
+            c.setAttribute("r", 12);
+            c.setAttribute("class", "node-circle node-nil");
+            c.setAttribute("stroke-width", "1.5");
+
+            // "+" icon
+            const plus = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text",
+            );
+            plus.setAttribute("class", "node-text-nil");
+            plus.setAttribute("text-anchor", "middle");
+            plus.setAttribute("dominant-baseline", "central");
+            plus.setAttribute("font-size", "14");
+            plus.setAttribute("fill", "var(--accent)");
+            plus.setAttribute("opacity", "0");
+            plus.textContent = "+";
+            plus.style.transition = "opacity .15s";
+
+            const t = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text",
+            );
+            t.setAttribute("class", "node-text-nil");
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("dominant-baseline", "central");
+            t.textContent = "NIL";
+            t.style.transition = "opacity .15s";
+
+            g.addEventListener("mouseenter", () => {
+              plus.setAttribute("opacity", "1");
+              t.setAttribute("opacity", "0");
+              c.setAttribute("stroke", "var(--accent)");
+            });
+            g.addEventListener("mouseleave", () => {
+              plus.setAttribute("opacity", "0");
+              t.setAttribute("opacity", "1");
+              c.setAttribute("stroke", "");
+            });
+
+            // Extract parent key and side from nilKey, e.g. "nil-L-10" or "nil-R-10"
+            const nilMatch = nilKey.match(/nil-([LR])-(.+)/);
+            if (nilMatch) {
+              const side = nilMatch[1],
+                parentKey = parseInt(nilMatch[2]);
+              g.onclick = (e) => {
+                e.stopPropagation();
+                onNilClick(parentKey, side, np.x, np.y);
+              };
+            }
+
+            g.appendChild(c);
+            g.appendChild(t);
+            g.appendChild(plus);
+            scene.appendChild(g);
+          }
+        }
+
+        // Draw nodes
+        function drawNode(node) {
+          if (!node || node === tree.NIL) return;
+          const pos = positions.get(node);
+          if (!pos) return;
+
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          g.setAttribute(
+            "class",
+            "node-group" +
+              (highlightKey === node.key ? " " + highlightType : ""),
+          );
+          g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
+          g.onclick = () => onNodeClick(node);
+
+          const circle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle",
+          );
+          circle.setAttribute("r", NODE_R);
+          circle.setAttribute(
+            "class",
+            `node-circle ${node.color === RED ? "node-red" : "node-black"}`,
+          );
+
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          text.setAttribute("class", "node-text");
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("dominant-baseline", "central");
+          text.textContent = node.key;
+
+          // Hover tooltip
+          g.addEventListener("mouseenter", (e) => showNodeTooltip(e, node));
+          g.addEventListener("mousemove", (e) => moveNodeTooltip(e));
+          g.addEventListener("mouseleave", () => hideNodeTooltip());
+
+          // Double click: edit key
+          g.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            onNodeDblClick(node);
+          });
+
+          g.appendChild(circle);
+          g.appendChild(text);
+          scene.appendChild(g);
+
+          drawNode(node.left);
+          drawNode(node.right);
+        }
+
+        drawNode(tree.root);
+
+        // Center the view
+        fitView();
+        updateProps();
+      }
+
+      function onNodeClick(node) {
+        const oldColor = node.color;
+        node.color = node.color === RED ? BLACK : RED;
+        const isRoot = node === tree.root;
+        const newLabel =
+          node.color === RED ? '<span class="warning">Rot</span>' : "Schwarz";
+        const oldLabel = oldColor === RED ? "Rot" : "Schwarz";
+        addLog(
+          `Farbe geändert: ${node.key}  ${oldLabel} → ${node.color === RED ? "Rot" : "Schwarz"}`,
+          "recolor",
+        );
+        setStatus(
+          `Knoten <span class="highlight">${node.key}</span>: ${oldLabel} → ${newLabel}` +
+            (isRoot
+              ? ' <span class="warning">(Wurzel sollte schwarz sein!)</span>'
+              : ""),
+        );
+        render(node.key, "highlight-recolor");
+        updateProps();
+        validateRulesQuiet();
+      }
+
+      function onNodeDblClick(node) {
+        const input = prompt(
+          `Neuer Schlüssel für Knoten ${node.key}:`,
+          node.key,
+        );
+        if (input === null) return; // abgebrochen
+        const newKey = parseInt(input, 10);
+        if (isNaN(newKey)) return;
+        if (newKey === node.key) return;
+        // Prüfen ob Schlüssel bereits existiert
+        const existing = (() => {
+          let found = false;
+          const walk = (n) => {
+            if (!n || n === tree.NIL) return;
+            if (n.key === newKey && n !== node) {
+              found = true;
+              return;
+            }
+            walk(n.left);
+            walk(n.right);
+          };
+          walk(tree.root);
+          return found;
+        })();
+        if (existing) {
+          setStatus(
+            `Schlüssel <span class="highlight">${newKey}</span> existiert bereits!`,
+          );
+          return;
+        }
+        const oldKey = node.key;
+        node.key = newKey;
+        addLog(`Schlüssel geändert: ${oldKey} → ${newKey}`, "recolor");
+        setStatus(
+          `Knoten umbenannt: <span class="highlight">${oldKey}</span> → <span class="highlight">${newKey}</span>`,
+        );
+        render(newKey, "highlight-recolor");
+        updateProps();
+        validateRulesQuiet();
+      }
+
+      function getDepth(node) {
+        let d = 0,
+          n = node;
+        while (n.parent) {
+          d++;
+          n = n.parent;
+        }
+        return d;
+      }
+      // ═══════════════════════════════════════
+      //   NODE TOOLTIP (Schwarzhöhe on hover)
+      // ═══════════════════════════════════════
+      function nodeBlackHeight(node) {
+        // Black-height = number of black nodes on any path from node (exclusive) to NIL leaf
+        if (!node || node === tree.NIL) return 0;
+        const left = nodeBlackHeight(node.left);
+        if (left === -1) return -1;
+        const right = nodeBlackHeight(node.right);
+        if (right === -1) return -1;
+        if (left !== right) return -1;
+        return left + (node.left && node.left.color === BLACK ? 1 : 0);
+      }
+
+      function nodeSubtreeBlackHeight(node) {
+        // Returns the black-height as seen from this node downward
+        // i.e. count of black nodes on any path to NIL, not counting node itself
+        function bh(n) {
+          if (n === tree.NIL) return 0;
+          const l = bh(n.left);
+          if (l === -1) return -1;
+          const r = bh(n.right);
+          if (r === -1) return -1;
+          if (l !== r) return -1;
+          return l + (n.color === BLACK ? 1 : 0);
+        }
+        // We want count of black nodes strictly below node on any path to NIL
+        const l = bh(node.left);
+        const r = bh(node.right);
+        if (l === -1 || r === -1 || l !== r) return "✗";
+        return (
+          l + (node.left !== tree.NIL && node.left.color === BLACK ? 0 : 0)
+        ); // just l since it already counts children
+      }
+
+      function calcNodeBH(node) {
+        // Black-height of node = number of black nodes on path from node's child down to NIL (inclusive NIL sentinel)
+        function bh(n) {
+          if (n === tree.NIL) return 1; // NIL counts as black
+          const l = bh(n.left);
+          if (l === -1) return -1;
+          const r = bh(n.right);
+          if (r === -1) return -1;
+          if (l !== r) return -1;
+          return l + (n.color === BLACK ? 1 : 0);
+        }
+        // BH of a node = BH of its subtree minus 1 if node itself is black (we exclude the node)
+        // Standard definition: bh(x) = black nodes strictly below x on any path to NIL
+        function bhBelow(n) {
+          if (n === tree.NIL) return 0;
+          const l = bhBelow(n.left);
+          if (l === -1) return -1;
+          const r = bhBelow(n.right);
+          if (r === -1) return -1;
+          if (l !== r) return -1;
+          return (
+            l +
+            (n.left === tree.NIL ? 0 : n.left.color === BLACK ? 1 : 0) +
+            (n.left === tree.NIL ? 1 : 0)
+          ); // count NIL as 1
+        }
+        // Simpler: just count black nodes on leftmost path to NIL, not counting node itself
+        let count = 0,
+          cur = node.left;
+        while (cur !== tree.NIL) {
+          if (cur.color === BLACK) count++;
+          cur = cur.left;
+        }
+        count++; // count the NIL itself as black
+        // Validate: also check right path
+        let countR = 0;
+        cur = node.right;
+        while (cur !== tree.NIL) {
+          if (cur.color === BLACK) countR++;
+          cur = cur.left;
+        }
+        countR++;
+        if (count !== countR) return "✗ (ungültig)";
+        return count;
+      }
+
+      function showNodeTooltip(e, node) {
+        const bh = calcNodeBH(node);
+        const depth = getDepth(node);
+        const colorName = node.color === RED ? "Rot" : "Schwarz";
+        const container = document.getElementById("canvas-container");
+        const tip = document.getElementById("node-tooltip");
+        tip.innerHTML =
+          `<span class="tt-label">Schlüssel</span> <strong>${node.key}</strong> &nbsp;·&nbsp; <span class="tt-label">Farbe</span> ${colorName}<br>` +
+          `<span class="tt-label">Schwarzhöhe</span> <span class="tt-bh">${bh}</span> &nbsp;·&nbsp; <span class="tt-label">Tiefe</span> ${depth}`;
+        tip.classList.add("visible");
+        moveNodeTooltip(e);
+      }
+
+      function moveNodeTooltip(e) {
+        const container = document.getElementById("canvas-container");
+        const rect = container.getBoundingClientRect();
+        const tip = document.getElementById("node-tooltip");
+        let x = e.clientX - rect.left + 14;
+        let y = e.clientY - rect.top - 10;
+        // Keep in bounds
+        if (x + 220 > rect.width) x = e.clientX - rect.left - 230;
+        if (y + 70 > rect.height) y = e.clientY - rect.top - 65;
+        tip.style.left = x + "px";
+        tip.style.top = y + "px";
+      }
+
+      function hideNodeTooltip() {
+        document.getElementById("node-tooltip").classList.remove("visible");
+      }
+
+      // ═══════════════════════════════════════
+      //   NIL CLICK — INSERT VIA POPUP
+      // ═══════════════════════════════════════
+      let nilInsertTarget = null; // { parentKey, side }
+
+      function onNilClick(parentKey, side, svgX, svgY) {
+        nilInsertTarget = { parentKey, side };
+
+        // Convert SVG coords to screen coords for popup placement
+        const svgEl = document.getElementById("tree");
+        const container = document.getElementById("canvas-container");
+        const pt = svgEl.createSVGPoint();
+        pt.x = svgX;
+        pt.y = svgY;
+        const { scale, tx, ty } = viewTransform;
+        const screenX = svgX * scale + tx;
+        const screenY = svgY * scale + ty;
+
+        const popup = document.getElementById("nil-popup");
+        const cRect = container.getBoundingClientRect();
+        // Position popup: offset slightly so it doesn't cover the node
+        let left = screenX - 80;
+        let top = screenY + 18;
+        // Keep in bounds
+        left = Math.max(8, Math.min(left, cRect.width - 175));
+        top = Math.max(8, Math.min(top, cRect.height - 110));
+
+        popup.style.left = left + "px";
+        popup.style.top = top + "px";
+        popup.classList.add("visible");
+
+        const inp = document.getElementById("nil-popup-input");
+        inp.value = "";
+        setTimeout(() => inp.focus(), 50);
+      }
+
+      function confirmNilInsert() {
+        const val = parseInt(document.getElementById("nil-popup-input").value);
+        if (isNaN(val)) {
+          document.getElementById("nil-popup-input").focus();
+          return;
+        }
+        closeNilPopup();
+        // Reuse the step-by-step insert
+        document.getElementById("single-input").value = String(val);
+        insertSingle();
+      }
+
+      function closeNilPopup() {
+        document.getElementById("nil-popup").classList.remove("visible");
+        nilInsertTarget = null;
+      }
+
+      // Close popup on click outside
+      document.addEventListener("click", (e) => {
+        const popup = document.getElementById("nil-popup");
+        if (
+          popup &&
+          popup.classList.contains("visible") &&
+          !popup.contains(e.target)
+        ) {
+          closeNilPopup();
+        }
+      });
+
+      // Enter key in popup input
+      document
+        .getElementById("nil-popup-input")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") confirmNilInsert();
+          if (e.key === "Escape") closeNilPopup();
+        });
+
+      // ═══════════════════════════════════════
+      //   PREORDER LOAD
+      // ═══════════════════════════════════════
+      function loadPreorder() {
+        const raw = document.getElementById("preorder-input").value.trim();
+        if (!raw) return;
+
+        const tokens = raw.split(/\s+/);
+        const nodes = tokens
+          .map((t) => {
+            const match = t.match(/^(-?\d+)([RS]?)$/i);
+            if (!match) return null;
+            return {
+              key: parseInt(match[1]),
+              color: match[2].toUpperCase() === "R" ? RED : BLACK,
+            };
+          })
+          .filter(Boolean);
+
+        if (nodes.length === 0) {
+          setStatus('<span class="warning">Ungültige Eingabe</span>');
+          return;
+        }
+
+        // Build tree from preorder with color info
+        tree = new RBTree();
+        buildFromPreorder(nodes);
+        addLog(`Baum aus Preorder geladen: ${tokens.join(" ")}`, "done");
+        render();
+        validateRules();
+      }
+
+      function buildFromPreorder(nodes) {
+        // Reconstruct BST structure preserving colors (as given by user)
+        // We insert in preorder sequence but keep the colors
+        const nodeMap = new Map();
+        for (const n of nodes) {
+          const rb = new RBNode(n.key, n.color);
+          rb.left = tree.NIL;
+          rb.right = tree.NIL;
+          nodeMap.set(n.key, rb);
+        }
+
+        // Insert BST-style preserving order
+        for (const n of nodes) {
+          const rb = nodeMap.get(n.key);
+          if (tree.root === tree.NIL) {
+            tree.root = rb;
+            rb.parent = null;
+          } else {
+            let x = tree.root;
+            while (true) {
+              if (rb.key < x.key) {
+                if (x.left === tree.NIL) {
+                  x.left = rb;
+                  rb.parent = x;
+                  break;
+                }
+                x = x.left;
+              } else {
+                if (x.right === tree.NIL) {
+                  x.right = rb;
+                  rb.parent = x;
+                  break;
+                }
+                x = x.right;
+              }
+            }
+          }
+        }
+        tree.root.color = BLACK; // ensure root is black
+      }
+
+      // ═══════════════════════════════════════
+      //   SINGLE INSERT / DELETE
+      // ═══════════════════════════════════════
+      let animQueue = [];
+      let isAnimating = false;
+
+      // ── Step-by-step insert ──
+      let stepSnapshots = [];
+      let stepIndex = 0;
+
+      function insertSingle() {
+        const val = parseInt(document.getElementById("single-input").value);
+        if (isNaN(val)) return;
+        document.getElementById("single-input").value = "";
+
+        if (tree.search(val)) {
+          addLog(`  ${val} bereits vorhanden`, "done");
+          setStatus(`<span class="warning">${val} ist bereits im Baum</span>`);
+          return;
+        }
+
+        addLog(`→ Einfügen: ${val}`, "step");
+
+        // First: insert into tree so search() works during snapshot generation
+        const tempTree = new RBTree();
+        // Rebuild temp tree with same structure
+        const copyInto = (src, dst, srcNil) => {
+          if (src === srcNil) return dst.NIL;
+          const n = new RBNode(src.key, src.color);
+          n.left = dst.NIL;
+          n.right = dst.NIL;
+          return n;
+        };
+        // Deep clone current tree into tempTree
+        const cloneTree = (srcRoot, srcNil, dstTree) => {
+          const walk = (n) => {
+            if (n === srcNil) return dstTree.NIL;
+            const rb = new RBNode(n.key, n.color);
+            rb.left = walk(n.left);
+            rb.right = walk(n.right);
+            if (rb.left !== dstTree.NIL) rb.left.parent = rb;
+            if (rb.right !== dstTree.NIL) rb.right.parent = rb;
+            return rb;
+          };
+          dstTree.root = walk(srcRoot);
+          if (dstTree.root !== dstTree.NIL) dstTree.root.parent = null;
+        };
+        cloneTree(tree.root, tree.NIL, tempTree);
+        // Insert into tempTree to get snapshots
+        tempTree.insert(val);
+        // Now generate snapshots (which runs insertFixup again on the already-inserted key)
+        // Actually: insert into a fresh clone, capture steps
+        const snapTree = new RBTree();
+        cloneTree(tree.root, tree.NIL, snapTree);
+        // Insert without fixup first to position the node
+        const z2 = new RBNode(val, RED);
+        z2.left = snapTree.NIL;
+        z2.right = snapTree.NIL;
+        let yy = null,
+          xx = snapTree.root;
+        while (xx !== snapTree.NIL) {
+          yy = xx;
+          xx = val < xx.key ? xx.left : xx.right;
+        }
+        z2.parent = yy;
+        if (!yy) snapTree.root = z2;
+        else if (val < yy.key) yy.left = z2;
+        else yy.right = z2;
+        // Now get snapshots from fixup
+        stepSnapshots = snapTree.insertFixupSteps(val);
+
+        // Actually apply the insert to the real tree
+        tree.insert(val);
+
+        stepIndex = 0;
+        renderStep();
+        openStepPanel();
+      }
+
+      function renderStep() {
+        if (!stepSnapshots.length) return;
+        const snap = stepSnapshots[stepIndex];
+        const h = snap.highlights;
+
+        // Render from snapshot
+        renderFromSnapshot(snap.treeSnapshot, h);
+
+        // Update panel
+        document.getElementById("step-title").textContent = snap.label;
+        document.getElementById("step-desc").innerHTML = snap.desc;
+        document.getElementById("step-counter").textContent =
+          `${stepIndex + 1} / ${stepSnapshots.length}`;
+        document.getElementById("btn-prev").disabled = stepIndex === 0;
+        document.getElementById("btn-next").disabled =
+          stepIndex === stepSnapshots.length - 1;
+        document.getElementById("btn-next").textContent =
+          stepIndex === stepSnapshots.length - 1 ? "Fertig ✓" : "Weiter →";
+
+        // Progress dots
+        const prog = document.getElementById("step-progress");
+        prog.innerHTML = "";
+        stepSnapshots.forEach((_, i) => {
+          const d = document.createElement("div");
+          d.className =
+            "step-dot" +
+            (i < stepIndex ? " done" : i === stepIndex ? " active" : "");
+          prog.appendChild(d);
+        });
+
+        // Log
+        addLog(
+          `  [${stepIndex + 1}] ${snap.label}`,
+          snap.label.includes("Rotation")
+            ? "rot"
+            : snap.label.includes("Umfärb")
+              ? "recolor"
+              : "step",
+        );
+      }
+
+      function renderFromSnapshot(snapRoot, highlights) {
+        // Render tree from a plain-object snapshot (no NIL sentinel, nulls for leaves)
+        scene.innerHTML = "";
+        if (!snapRoot) {
+          fitView();
+          return;
+        }
+
+        const pos = new Map();
+        const counter = { v: 0 };
+
+        const inorder = (n, depth) => {
+          if (!n) return;
+          inorder(n.left, depth + 1);
+          pos.set(n, {
+            x: counter.v++ * (NODE_R * 2 + H_GAP),
+            y: depth * (NODE_R * 2 + V_GAP),
+          });
+          inorder(n.right, depth + 1);
+        };
+        inorder(snapRoot, 0);
+
+        // NIL positions
+        const nilPos = {};
+        if (showNil) {
+          const addNils = (n) => {
+            if (!n) return;
+            const p = pos.get(n);
+            if (!p) return;
+            if (!n.left)
+              nilPos[`nil-L-${n.key}`] = {
+                x: p.x - NODE_R - H_GAP * 0.4,
+                y: p.y + NODE_R * 2 + V_GAP * 0.6,
+              };
+            else addNils(n.left);
+            if (!n.right)
+              nilPos[`nil-R-${n.key}`] = {
+                x: p.x + NODE_R + H_GAP * 0.4,
+                y: p.y + NODE_R * 2 + V_GAP * 0.6,
+              };
+            else addNils(n.right);
+          };
+          addNils(snapRoot);
+        }
+
+        // Draw edges
+        const drawE = (x1, y1, x2, y2, dash = false, color = null) => {
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line",
+          );
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1 + NODE_R);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2 - NODE_R);
+          line.setAttribute("class", "edge-line");
+          if (color) line.setAttribute("stroke", color);
+          if (dash) {
+            line.setAttribute("stroke-dasharray", "3 3");
+            line.setAttribute("opacity", "0.4");
+          }
+          scene.appendChild(line);
+        };
+
+        const drawEdges = (n) => {
+          if (!n) return;
+          const p = pos.get(n);
+          if (!p) return;
+          if (n.left) {
+            const c = pos.get(n.left);
+            if (c) drawE(p.x, p.y, c.x, c.y);
+            drawEdges(n.left);
+          } else if (showNil) {
+            const c = nilPos[`nil-L-${n.key}`];
+            if (c) drawE(p.x, p.y, c.x, c.y, true);
+          }
+          if (n.right) {
+            const c = pos.get(n.right);
+            if (c) drawE(p.x, p.y, c.x, c.y);
+            drawEdges(n.right);
+          } else if (showNil) {
+            const c = nilPos[`nil-R-${n.key}`];
+            if (c) drawE(p.x, p.y, c.x, c.y, true);
+          }
+        };
+        drawEdges(snapRoot);
+
+        // Draw rotation arc if applicable
+        if (highlights.rotPivot && highlights.rotDir) {
+          const pivotNode = findInSnap(snapRoot, highlights.rotPivot);
+          if (pivotNode) {
+            const pp = pos.get(pivotNode);
+            if (pp) drawRotArc(pp.x, pp.y, highlights.rotDir);
+          }
+        }
+
+        // Draw NIL nodes
+        if (showNil) {
+          for (const [, np] of Object.entries(nilPos)) {
+            const g = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "g",
+            );
+            g.setAttribute("transform", `translate(${np.x},${np.y})`);
+            const c = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "circle",
+            );
+            c.setAttribute("r", 10);
+            c.setAttribute("class", "node-circle node-nil");
+            c.setAttribute("stroke-width", "1");
+            const t = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text",
+            );
+            t.setAttribute("class", "node-text-nil");
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("dominant-baseline", "central");
+            t.textContent = "NIL";
+            g.appendChild(c);
+            g.appendChild(t);
+            scene.appendChild(g);
+          }
+        }
+
+        // Draw nodes
+        const drawNode = (n) => {
+          if (!n) return;
+          const p = pos.get(n);
+          if (!p) return;
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          // Determine highlight class
+          let hClass = "";
+          if (n.key === highlights.current) hClass = "node-current";
+          else if (n.key === highlights.parent) hClass = "node-parent";
+          else if (n.key === highlights.gp) hClass = "node-gp";
+          else if (n.key === highlights.uncle) hClass = "node-uncle";
+          else if (n.key === highlights.pivot) hClass = "node-pivot";
+          g.setAttribute("class", "node-group " + hClass);
+          g.setAttribute("transform", `translate(${p.x},${p.y})`);
+
+          const circle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle",
+          );
+          circle.setAttribute("r", NODE_R);
+          circle.setAttribute(
+            "class",
+            `node-circle ${n.color === RED ? "node-red" : "node-black"}`,
+          );
+
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          text.setAttribute("class", "node-text");
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("dominant-baseline", "central");
+          text.textContent = n.key;
+
+          // Role label above node
+          let roleLabel = "";
+          if (n.key === highlights.current) roleLabel = "z";
+          else if (n.key === highlights.parent) roleLabel = "Elter";
+          else if (n.key === highlights.gp) roleLabel = "G-Elter";
+          else if (n.key === highlights.uncle) roleLabel = "Onkel";
+          if (roleLabel) {
+            const rl = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text",
+            );
+            rl.setAttribute("y", -NODE_R - 4);
+            rl.setAttribute("text-anchor", "middle");
+            rl.setAttribute("font-size", "10");
+            rl.setAttribute(
+              "fill",
+              n.key === highlights.current
+                ? "var(--warn)"
+                : n.key === highlights.gp
+                  ? "var(--warn)"
+                  : "var(--accent)",
+            );
+            rl.setAttribute("font-weight", "600");
+            rl.textContent = roleLabel;
+            g.appendChild(circle);
+            g.appendChild(text);
+            g.appendChild(rl);
+          } else {
+            g.appendChild(circle);
+            g.appendChild(text);
+          }
+          scene.appendChild(g);
+          drawNode(n.left);
+          drawNode(n.right);
+        };
+        drawNode(snapRoot);
+        fitView();
+      }
+
+      function findInSnap(root, key) {
+        if (!root) return null;
+        if (root.key === key) return root;
+        return findInSnap(root.left, key) || findInSnap(root.right, key);
+      }
+
+      function drawRotArc(cx, cy, dir) {
+        // Draw a curved arc around the pivot node indicating rotation direction
+        const r = NODE_R + 10;
+        const path = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        let d, color;
+        if (dir === "L") {
+          // Clockwise arc (left rotation)
+          d = `M ${cx - r} ${cy - 10} A ${r} ${r} 0 1 1 ${cx + r} ${cy - 10}`;
+          color = "#f0a040";
+        } else {
+          // Counter-clockwise arc (right rotation)
+          d = `M ${cx + r} ${cy - 10} A ${r} ${r} 0 1 0 ${cx - r} ${cy - 10}`;
+          color = "#4fc3a0";
+        }
+        path.setAttribute("d", d);
+        path.setAttribute("class", "rot-arc-path");
+        path.setAttribute("stroke", color);
+        // Arrow tip
+        const tip = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text",
+        );
+        tip.setAttribute("x", dir === "L" ? cx + r + 2 : cx - r - 2);
+        tip.setAttribute("y", cy - 6);
+        tip.setAttribute("font-size", "14");
+        tip.setAttribute("fill", color);
+        tip.setAttribute("text-anchor", dir === "L" ? "start" : "end");
+        tip.textContent = dir === "L" ? "↻" : "↺";
+        scene.appendChild(path);
+        scene.appendChild(tip);
+      }
+
+      function stepNext() {
+        if (stepIndex < stepSnapshots.length - 1) {
+          stepIndex++;
+          renderStep();
+        } else closeStepPanel();
+      }
+      function stepPrev() {
+        if (stepIndex > 0) {
+          stepIndex--;
+          renderStep();
+        }
+      }
+      function stepSkipAll() {
+        stepIndex = stepSnapshots.length - 1;
+        renderStep();
+        setTimeout(closeStepPanel, 800);
+      }
+      function openStepPanel() {
+        document.getElementById("step-panel").classList.add("visible");
+        showTab("log");
+      }
+      function closeStepPanel() {
+        document.getElementById("step-panel").classList.remove("visible");
+        render();
+        updateProps();
+        validateRulesQuiet();
+      }
+
+      function deleteSingle() {
+        const val = parseInt(document.getElementById("delete-input").value);
+        if (isNaN(val)) return;
+        document.getElementById("delete-input").value = "";
+
+        addLog(`→ Löschen: ${val}`, "step");
+        const ok = tree.delete(val);
+        if (!ok) {
+          setStatus(`<span class="warning">${val} nicht gefunden</span>`);
+          return;
+        }
+        setStatus(`Knoten <span class="highlight">${val}</span> gelöscht`);
+        addLog(`  ${val} gelöscht, Baum repariert`, "done");
+        render();
+        updateProps();
+        validateRulesQuiet();
+      }
+
+      function clearTree() {
+        tree = new RBTree();
+        render();
+        setStatus("Baum geleert.");
+        document.getElementById("log").innerHTML = "";
+        document.getElementById("traversal-result").textContent = "";
+      }
+
+      // ═══════════════════════════════════════
+      //   EXAMPLES
+      // ═══════════════════════════════════════
+      const EXAMPLES = {
+        basic: "10S 5R 15R",
+        medium: "13S 8R 17R 1S 11S 15S 25S 6R",
+        exam: "20S 10R 30R 5S 15S 25S 35S 3R 7R",
+        exam2: "50S 25R 75R 12S 37S 62S 87S 6R 18R 31R 43R",
+        large: "40S 20R 60R 10S 30S 50S 70S 5R 15R 25R 35R 45R 55R 65R 75R",
+      };
+
+      function loadExample(name) {
+        document.getElementById("preorder-input").value = EXAMPLES[name];
+        document.getElementById("quiz-hint-box").style.display = "none";
+        loadPreorder();
+      }
+
+      // ── Random Quiz ──
+      let quizSolution = null; // stores correct colors keyed by node key
+
+      function loadRandomQuiz() {
+        // Generate a valid RB tree by inserting random keys, then strip colors
+        const count = 7 + Math.floor(Math.random() * 6); // 7–12 nodes
+        const keys = [];
+        const used = new Set();
+        while (keys.length < count) {
+          const k = 1 + Math.floor(Math.random() * 99);
+          if (!used.has(k)) {
+            used.add(k);
+            keys.push(k);
+          }
+        }
+
+        // Build a valid RB tree
+        const tempTree = new RBTree();
+        for (const k of keys) tempTree.insert(k);
+
+        // Save solution (color of each node)
+        quizSolution = new Map();
+        const saveColors = (n) => {
+          if (n === tempTree.NIL) return;
+          quizSolution.set(n.key, n.color);
+          saveColors(n.left);
+          saveColors(n.right);
+        };
+        saveColors(tempTree.root);
+
+        // Build preorder string WITHOUT colors (all rendered as black = ungefärbt)
+        const preTokens = [];
+        const preWalk = (n) => {
+          if (n === tempTree.NIL) return;
+          preTokens.push(String(n.key)); // no color suffix → loaded as black
+          preWalk(n.left);
+          preWalk(n.right);
+        };
+        preWalk(tempTree.root);
+
+        document.getElementById("preorder-input").value = preTokens.join(" ");
+        document.getElementById("quiz-hint-box").style.display = "block";
+
+        // Load and render (all nodes will appear black since no color suffix)
+        tree = new RBTree();
+        buildFromPreorder(
+          preTokens.map((t) => ({ key: parseInt(t), color: BLACK })),
+        );
+        addLog(
+          `Zufälliger Übungsbaum (${count} Knoten) geladen — jetzt einfärben!`,
+          "step",
+        );
+        setStatus(
+          `Übungsbaum geladen — <span class="highlight">${count} Knoten</span>, alle schwarz. Jetzt korrekt einfärben!`,
+        );
+        render();
+        // Reset rule indicators
+        [1, 2, 3, 4, 5].forEach(
+          (r) => (document.getElementById("rule" + r).className = ""),
+        );
+        document.getElementById("rule-result").textContent = "";
+        updateProps();
+      }
+
+      function revealSolution() {
+        if (!quizSolution) return;
+        // Apply correct colors
+        const applyColors = (n) => {
+          if (n === tree.NIL) return;
+          if (quizSolution.has(n.key)) n.color = quizSolution.get(n.key);
+          applyColors(n.left);
+          applyColors(n.right);
+        };
+        applyColors(tree.root);
+        addLog("Lösung aufgedeckt", "done");
+        setStatus(
+          '<span class="highlight">Lösung angezeigt</span> — Vergleiche mit deiner Einfärbung!',
+        );
+        render();
+        updateProps();
+        validateRulesQuiet();
+        document.getElementById("quiz-hint-box").style.display = "none";
+      }
+
+      // ═══════════════════════════════════════
+      //   ANALYSIS
+      // ═══════════════════════════════════════
+      function updateProps() {
+        const count = tree.countNodes();
+        const h = count ? tree.height() : 0;
+        const bh = count ? tree.blackHeight() : 0;
+        const valid = tree.validate().length === 0;
+
+        document.getElementById("p-count").textContent = count;
+        document.getElementById("p-height").textContent = h || "–";
+        document.getElementById("p-bh").textContent =
+          bh > 0 ? bh : count ? "Fehler" : "–";
+
+        const pv = document.getElementById("p-valid");
+        pv.textContent = count ? (valid ? "✓" : "✗") : "–";
+        pv.className = "prop-value " + (count ? (valid ? "ok" : "err") : "");
+      }
+
+      function showTraversal(type) {
+        let result = [];
+        if (type === "inorder") result = tree.inorder().map(String);
+        if (type === "preorder") result = tree.preorderArr();
+        if (type === "postorder") result = tree.postorder().map(String);
+        document.getElementById("traversal-result").textContent =
+          result.join("  ") || "(leer)";
+      }
+
+      function searchNode() {
+        const val = parseInt(document.getElementById("search-input").value);
+        if (isNaN(val)) return;
+        const node = tree.search(val);
+        if (node) {
+          setStatus(
+            `Knoten <span class="highlight">${val}</span> gefunden — ${node.color === RED ? '<span class="warning">Rot</span>' : "Schwarz"}`,
+          );
+          render(val, "highlight-node");
+        } else {
+          setStatus(`<span class="warning">${val} nicht im Baum</span>`);
+        }
+      }
+
+      // ═══════════════════════════════════════
+      //   RULE VALIDATION
+      // ═══════════════════════════════════════
+      function validateRules() {
+        const violations = tree.validate();
+        [1, 2, 3, 4, 5].forEach((r) => {
+          document.getElementById(`rule${r}`).className = violations.find(
+            (x) => x.rule === r,
+          )
+            ? "violated"
+            : "";
+        });
+        document.getElementById("rule-bst").className = violations.find(
+          (x) => x.rule === "bst",
+        )
+          ? "violated"
+          : "";
+        const res = document.getElementById("rule-result");
+        if (violations.length === 0) {
+          res.style.color = "var(--accent2)";
+          res.textContent = "✓ Alle RSB-Eigenschaften erfüllt";
+        } else {
+          res.style.color = "var(--red)";
+          res.textContent = violations
+            .map(
+              (v) =>
+                `✗ ${v.rule === "bst" ? "BST" : "Regel " + v.rule}: ${v.msg}`,
+            )
+            .join("\n");
+        }
+        showTab("regeln");
+      }
+
+      function validateRulesQuiet() {
+        const violations = tree.validate();
+        [1, 2, 3, 4, 5].forEach((r) => {
+          document.getElementById(`rule${r}`).className = violations.find(
+            (x) => x.rule === r,
+          )
+            ? "violated"
+            : "";
+        });
+        document.getElementById("rule-bst").className = violations.find(
+          (x) => x.rule === "bst",
+        )
+          ? "violated"
+          : "";
+      }
+
+      // ═══════════════════════════════════════
+      //   VIEW CONTROLS
+      // ═══════════════════════════════════════
+      let viewTransform = { scale: 1, tx: 0, ty: 20 };
+
+      function fitView() {
+        const container = document.getElementById("canvas-container");
+        const W = container.clientWidth,
+          H = container.clientHeight;
+        const bbox = scene.getBBox();
+        if (!bbox || bbox.width === 0) return;
+        const pad = 60;
+        const scaleX = (W - pad * 2) / bbox.width;
+        const scaleY = (H - pad * 2) / bbox.height;
+        const scale = Math.min(scaleX, scaleY, 1.5);
+        const tx = (W - bbox.width * scale) / 2 - bbox.x * scale;
+        const ty = (H - bbox.height * scale) / 2 - bbox.y * scale;
+        viewTransform = { scale, tx, ty };
+        applyTransform();
+      }
+
+      function zoom(factor) {
+        viewTransform.scale = Math.max(
+          0.2,
+          Math.min(3, viewTransform.scale * factor),
+        );
+        applyTransform();
+      }
+
+      function resetZoom() {
+        viewTransform = { scale: 1, tx: 0, ty: 20 };
+        applyTransform();
+      }
+
+      function applyTransform() {
+        const { scale, tx, ty } = viewTransform;
+        scene.setAttribute(
+          "transform",
+          `translate(${tx},${ty}) scale(${scale})`,
+        );
+      }
+
+      // Pan
+      svg.addEventListener("mousedown", (e) => {
+        isPanning = true;
+        panStartX = e.clientX - viewTransform.tx;
+        panStartY = e.clientY - viewTransform.ty;
+      });
+      svg.addEventListener("mousemove", (e) => {
+        if (!isPanning) return;
+        viewTransform.tx = e.clientX - panStartX;
+        viewTransform.ty = e.clientY - panStartY;
+        applyTransform();
+      });
+      svg.addEventListener("mouseup", () => (isPanning = false));
+      svg.addEventListener("mouseleave", () => (isPanning = false));
+      svg.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          zoom(e.deltaY < 0 ? 1.1 : 0.9);
+        },
+        { passive: false },
+      );
+
+      // ═══════════════════════════════════════
+      //   NIL TOGGLE
+      // ═══════════════════════════════════════
+      function toggleNilNodes() {
+        showNil = !showNil;
+        document.getElementById("nil-toggle").textContent = showNil
+          ? "NIL verstecken"
+          : "NIL anzeigen";
+        render();
+      }
+
+      // ═══════════════════════════════════════
+      //   UI HELPERS
+      // ═══════════════════════════════════════
+      function showTab(name) {
+        document.querySelectorAll(".tab").forEach((t, i) => {
+          const names = ["einfuegen", "log", "info", "regeln"];
+          t.classList.toggle("active", names[i] === name);
+        });
+        document
+          .querySelectorAll(".panel")
+          .forEach((p) => p.classList.remove("active"));
+        const el = document.getElementById("tab-" + name);
+        if (el) el.classList.add("active");
+      }
+
+      function setStatus(html) {
+        document.getElementById("status-bar").innerHTML = html;
+      }
+
+      function addLog(msg, cls = "") {
+        const log = document.getElementById("log");
+        if (log.querySelector("span[style]")) log.innerHTML = "";
+        const line = document.createElement("div");
+        line.className = cls;
+        line.textContent = msg;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      // ═══════════════════════════════════════
+      //   KEYBOARD
+      // ═══════════════════════════════════════
+      document
+        .getElementById("single-input")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") insertSingle();
+        });
+      document
+        .getElementById("delete-input")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") deleteSingle();
+        });
+      document
+        .getElementById("search-input")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") searchNode();
+        });
+
+      // ═══════════════════════════════════════
+      //    INIT
+      // ═══════════════════════════════════════
+      loadExample("medium");
+    </script>
+  </body>
+</html>
